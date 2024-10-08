@@ -1,13 +1,11 @@
-#include "settings.h"
+#include "COMMON.h"
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <driver/gpio.h>
 #include <driver/i2c.h>
 
-#include <lcd.h>
-
-#include "hbridge.h"
+#include "Converter.h"
 
 static const char *TAG = "[" __TIME__ "]🅱 rzedwornidza";
 
@@ -85,7 +83,7 @@ extern "C" void app_main(void)
 
 	lcd_write_str(&lcd_handle, "gotowy.");
 
-	driver.setRatio(1);
+	driver.set_ratio(1);
 
 	while (true)
 		vTaskDelay(pdMS_TO_TICKS(1000));

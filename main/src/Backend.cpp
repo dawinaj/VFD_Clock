@@ -2,17 +2,21 @@
 
 #include <limits>
 #include <cmath>
-
 #include <atomic>
 #include <mutex>
 
-#include <esp_timer.h>
-#include <soc/gpio_reg.h>
+// #include <esp_timer.h>
+// #include <soc/gpio_reg.h>
 #include <driver/gptimer.h>
+
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <driver/spi_master.h>
+#include <driver/gpio.h>
 
 #include "Communicator.h"
 
-#include "hbridge.h"
+#include "Converter.h"
 
 namespace Backend
 {
@@ -27,12 +31,15 @@ namespace Backend
 
 		// MCP3204 adc(SPI3_HOST, GPIO_NUM_5, 2'000'000);
 
-		// STATE MACHINE
-		uint32_t dg_out_state = 0;
-		std::array<AnIn_Range, an_in_num> an_in_range;
+		static constexpr int MCPWM_GRP = 0;
+		static constexpr uint32_t CLK_FRQ = 160'000'000; // 80MHz max?
+		static constexpr uint32_t PWM_FRQ = 100'000;	 // somewhere around 30k-300k, affects duty precision, response, losses, etc
+		static constexpr uint32_t DTNS = 100;			 // dead time in ns
 
-FullBridge();
-
+		McpwmTimer btimer(MCPWM_GRP, CLK_FRQ, CLK_FRQ / PWM_FRQ);
+		BuckConverter hbin(btimer, GPIO_NUM_16, GPIO_NUM_4, DTNS);
+		BoostConverter hbout(btimer, GPIO_NUM_5, GPIO_NUM_17, DTNS);
+		// FullBridge fb(hbin, hbout);
 
 		//================================//
 		//            HELPERS             //
@@ -63,27 +70,6 @@ FullBridge();
 		// CONSTANTS
 		constexpr uint32_t dg_out_mask = (1 << dg_out_num) - 1;
 		constexpr uint32_t dg_in_mask = (1 << dg_in_num) - 1;
-
-		// LUT
-		constexpr size_t dg_out_lut_sz = 1 << dg_out_num;
-		constexpr std::array<uint32_t, dg_out_lut_sz> dg_out_lut_s = []()
-		{
-			std::array<uint32_t, dg_out_lut_sz> ret = {};
-			for (size_t in = 0; in < dg_out_lut_sz; ++in)
-				for (size_t b = 0; b < dg_out_num; ++b)
-					if (in & BIT(b))
-						ret[in] |= BIT(dig_out[b]);
-			return ret;
-		}();
-		constexpr std::array<uint32_t, dg_out_lut_sz> dg_out_lut_r = []()
-		{
-			std::array<uint32_t, dg_out_lut_sz> ret = {};
-			for (size_t in = 0; in < dg_out_lut_sz; ++in)
-				for (size_t b = 0; b < dg_out_num; ++b)
-					if (~in & BIT(b))
-						ret[in] |= BIT(dig_out[b]);
-			return ret;
-		}();
 
 		// I/O conversion
 		constexpr int32_t halfrangein = MCP3204::ref / 2;

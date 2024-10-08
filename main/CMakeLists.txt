@@ -2,7 +2,10 @@
 idf_component_register(
 	SRCS
 	"main.cpp"
-	"src/hbridge.cpp"
+	"src/Backend.cpp"
+	"src/Frontend.cpp"
+	"src/Communicator.cpp"
+	"src/Converter.cpp"
 	INCLUDE_DIRS
 	"."
 	"include/"
