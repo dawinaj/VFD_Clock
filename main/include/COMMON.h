@@ -17,13 +17,3 @@
 // TYPEDEFS
 // #include <esp_system.h>
 // #define LOG_MEMORY_MAX ESP_LOGD(TAG, "Max memory: %i", uxTaskGetStackHighWaterMark(NULL))
-
-template <typename T>
-T bound(const T &val, const T &mn, const T &mx)
-{
-	if (val < mn)
-		return mn;
-	if (val > mx)
-		return mx;
-	return val;
-}

@@ -46,27 +46,38 @@ protected:
 	static constexpr const char *const TAG = "Converter";
 
 private:
+	enum class OutputMode : uint8_t
+	{
+		Undefined = 0,
+		Normal,
+		ForcePass,
+		ForceFreewheel,
+		ForceOFF,
+	};
+
+private:
 	McpwmTimer &timer;
-	mcpwm_gen_handle_t &gen_d; // mosfet / master / Dominant
-	mcpwm_gen_handle_t &gen_r; // diode  / slave  / Recessive
-	const gpio_num_t gpio_d;
-	const gpio_num_t gpio_r;
+	const gpio_num_t gpio_d; // mosfet / master / Dominant
+	const gpio_num_t gpio_r; // diode  / slave  / Recessive
+
+	bool hasrecessive = false;
+	OutputMode outputMode = OutputMode::Undefined;
 
 	uint32_t deadtime_ticks = 0;
 	uint32_t duty_ticks_d = 0;
 	uint32_t duty_ticks_r = 0;
-	bool forced = false;
-	bool recessive = false;
 
 	mcpwm_oper_handle_t oper = nullptr;
+	mcpwm_gen_handle_t gen_d = nullptr;
+	mcpwm_gen_handle_t gen_r = nullptr;
 	mcpwm_cmpr_handle_t cmpr_d = nullptr;
 	mcpwm_cmpr_handle_t cmpr_r = nullptr;
 
-	mcpwm_gen_handle_t gen_h = nullptr;
-	mcpwm_gen_handle_t gen_l = nullptr;
+	mcpwm_gen_handle_t &gen_h;
+	mcpwm_gen_handle_t &gen_l;
 
 public:
-	ConverterBase(bool, McpwmTimer &, gpio_num_t, gpio_num_t = GPIO_NUM_NC, uint32_t = 0);
+	ConverterBase(bool, McpwmTimer &, gpio_num_t, gpio_num_t, uint32_t = 0);
 	~ConverterBase();
 
 	esp_err_t init();
@@ -118,16 +129,16 @@ public:
 
 //
 
-class FullBridge
+class BuckBoostConverter
 {
-	static constexpr const char *const TAG = "FullBridge";
+	static constexpr const char *const TAG = "BuckBoostConverter";
 
 	BuckConverter &bck;
 	BoostConverter &bst;
 
 public:
-	FullBridge(BuckConverter &, BoostConverter &);
-	~FullBridge();
+	BuckBoostConverter(BuckConverter &, BoostConverter &);
+	~BuckBoostConverter();
 
 	esp_err_t init();
 	esp_err_t deinit();

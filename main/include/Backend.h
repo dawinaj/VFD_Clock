@@ -26,7 +26,4 @@ namespace Backend
 	esp_err_t init();
 	esp_err_t deinit();
 
-	esp_err_t give_sem_emergency();
-
-	esp_err_t test();
 };

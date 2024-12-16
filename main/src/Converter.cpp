@@ -97,17 +97,20 @@ uint32_t McpwmTimer::period_ticks() const
 //
 
 ConverterBase::ConverterBase(bool inv, McpwmTimer &t, gpio_num_t gh, gpio_num_t gl, uint32_t d) : timer(t),
-																								  gen_d(!inv ? gen_h : gen_l),
-																								  gen_r(!inv ? gen_l : gen_h),
 																								  gpio_d(!inv ? gh : gl),
-																								  gpio_r(!inv ? gl : gh)
+																								  gpio_r(!inv ? gl : gh),
+																								  gen_h(!inv ? gen_d : gen_r),
+																								  gen_l(!inv ? gen_r : gen_d)
 {
 	deadtime_ticks = timer.ns_to_ticks(d);
 
-	recessive = GPIO_IS_VALID_OUTPUT_GPIO(gpio_r);
-
 	if (!GPIO_IS_VALID_OUTPUT_GPIO(gpio_d))
-		ESP_LOGE(TAG, "Invalid GPIO of dominant switch!");
+		ESP_LOGE(TAG, "Dominant switch invalid GPIO!");
+
+	hasrecessive = GPIO_IS_VALID_OUTPUT_GPIO(gpio_r);
+
+	if (!hasrecessive)
+		ESP_LOGD(TAG, "Recessive switch not used!");
 }
 
 ConverterBase::~ConverterBase() = default;
@@ -139,6 +142,10 @@ esp_err_t ConverterBase::init()
 	ESP_RETURN_ON_ERROR(
 		set_deadtime(),
 		TAG, "Failed to set_deadtime!");
+
+	ESP_RETURN_ON_ERROR(
+		force_off(),
+		TAG, "Failed to force_off!");
 
 	return ESP_OK;
 }
@@ -212,13 +219,13 @@ esp_err_t ConverterBase::set_tmr_events()
 	const mcpwm_gen_timer_event_action_t tmr_evt_d_cfg = {
 		.direction = MCPWM_TIMER_DIRECTION_UP,
 		.event = MCPWM_TIMER_EVENT_EMPTY,
-		.action = MCPWM_GEN_ACTION_HIGH,
+		.action = MCPWM_GEN_ACTION_LOW,
 	};
 
 	const mcpwm_gen_timer_event_action_t tmr_evt_r_cfg = {
 		.direction = MCPWM_TIMER_DIRECTION_UP,
 		.event = MCPWM_TIMER_EVENT_EMPTY,
-		.action = MCPWM_GEN_ACTION_LOW,
+		.action = MCPWM_GEN_ACTION_HIGH,
 	};
 
 	ESP_RETURN_ON_ERROR(
@@ -238,13 +245,13 @@ esp_err_t ConverterBase::set_cmpr_events()
 	const mcpwm_gen_compare_event_action_t cmpr_d_evt = {
 		.direction = MCPWM_TIMER_DIRECTION_UP,
 		.comparator = cmpr_d,
-		.action = MCPWM_GEN_ACTION_LOW,
+		.action = MCPWM_GEN_ACTION_HIGH,
 	};
 
 	const mcpwm_gen_compare_event_action_t cmpr_r_evt = {
 		.direction = MCPWM_TIMER_DIRECTION_UP,
 		.comparator = cmpr_r,
-		.action = MCPWM_GEN_ACTION_HIGH,
+		.action = MCPWM_GEN_ACTION_LOW,
 	};
 
 	ESP_RETURN_ON_ERROR(
@@ -261,7 +268,7 @@ esp_err_t ConverterBase::set_cmpr_events()
 
 esp_err_t ConverterBase::set_deadtime()
 {
-	const mcpwm_dead_time_config_t deadtime_d_cfg = {
+	const mcpwm_dead_time_config_t deadtime_r_cfg = {
 		.posedge_delay_ticks = deadtime_ticks,
 		.negedge_delay_ticks = deadtime_ticks,
 		.flags = {
@@ -269,9 +276,10 @@ esp_err_t ConverterBase::set_deadtime()
 		},
 	};
 
-	ESP_RETURN_ON_ERROR(
-		mcpwm_generator_set_dead_time(gen_d, gen_d, &deadtime_d_cfg),
-		TAG, "Failed to mcpwm_generator_set_dead_time!");
+	if (has_recessive())
+		ESP_RETURN_ON_ERROR(
+			mcpwm_generator_set_dead_time(gen_r, gen_r, &deadtime_r_cfg),
+			TAG, "Failed to mcpwm_generator_set_dead_time!");
 
 	return ESP_OK;
 }
@@ -370,16 +378,19 @@ esp_err_t ConverterBase::set_duty(float pwm)
 			mcpwm_comparator_set_compare_value(cmpr_r, duty_ticks_r),
 			TAG, "Failed to mcpwm_comparator_set_compare_values!");
 
-	if (forced) [[unlikely]]
-		ESP_RETURN_ON_ERROR(
-			unforce(),
-			TAG, "Failed to unforce!");
+	//	if (forced) [[unlikely]]
+	ESP_RETURN_ON_ERROR(
+		unforce(),
+		TAG, "Failed to unforce!");
 
 	return ESP_OK;
 }
 
 esp_err_t ConverterBase::force_pass()
 {
+	if (outputMode == OutputMode::ForcePass) [[likely]]
+		return ESP_OK;
+
 	if (gen_l)
 		ESP_RETURN_ON_ERROR(
 			mcpwm_generator_set_force_level(gen_l, 0, true),
@@ -390,13 +401,16 @@ esp_err_t ConverterBase::force_pass()
 			mcpwm_generator_set_force_level(gen_h, 1, true),
 			TAG, "Failed to mcpwm_generator_set_force_level!");
 
-	forced = true;
+	outputMode = OutputMode::ForcePass;
 
 	return ESP_OK;
 }
 
 esp_err_t ConverterBase::force_freewheel()
 {
+	if (outputMode == OutputMode::ForceFreewheel) [[likely]]
+		return ESP_OK;
+
 	if (gen_h)
 		ESP_RETURN_ON_ERROR(
 			mcpwm_generator_set_force_level(gen_h, 0, true),
@@ -407,13 +421,16 @@ esp_err_t ConverterBase::force_freewheel()
 			mcpwm_generator_set_force_level(gen_l, 1, true),
 			TAG, "Failed to mcpwm_generator_set_force_level!");
 
-	forced = true;
+	outputMode = OutputMode::ForceFreewheel;
 
 	return ESP_OK;
 }
 
 esp_err_t ConverterBase::force_off()
 {
+	if (outputMode == OutputMode::ForceOFF) [[likely]]
+		return ESP_OK;
+
 	ESP_RETURN_ON_ERROR(
 		mcpwm_generator_set_force_level(gen_d, 0, true),
 		TAG, "Failed to mcpwm_generator_set_force_level!");
@@ -423,23 +440,26 @@ esp_err_t ConverterBase::force_off()
 			mcpwm_generator_set_force_level(gen_r, 0, true),
 			TAG, "Failed to mcpwm_generator_set_force_level!");
 
-	forced = true;
+	outputMode = OutputMode::ForceOFF;
 
 	return ESP_OK;
 }
 
 esp_err_t ConverterBase::unforce()
 {
+	if (outputMode == OutputMode::Normal) [[likely]]
+		return ESP_OK;
+
 	ESP_RETURN_ON_ERROR(
-		mcpwm_generator_set_force_level(gen_d, -1, false),
+		mcpwm_generator_set_force_level(gen_d, -1, true),
 		TAG, "Failed to mcpwm_generator_set_force_level!");
 
 	if (has_recessive())
 		ESP_RETURN_ON_ERROR(
-			mcpwm_generator_set_force_level(gen_r, -1, false),
+			mcpwm_generator_set_force_level(gen_r, -1, true),
 			TAG, "Failed to mcpwm_generator_set_force_level!");
 
-	forced = false;
+	outputMode = OutputMode::Normal;
 
 	return ESP_OK;
 }
@@ -453,33 +473,47 @@ bool ConverterBase::pwm_ticks(float pwm)
 	const uint32_t prd = timer.period_ticks();
 	const uint32_t old = duty_ticks_d;
 
-	duty_ticks_d = std::lround(pwm * prd); // std::clamp<uint32_t>(cv, 0, prd);
+	const uint32_t ticks_high = std::lround(pwm * prd);
 
-	duty_ticks_r = duty_ticks_d + 2 * deadtime_ticks;
+	duty_ticks_d = prd - ticks_high; // std::clamp<uint32_t>(cv, 0, prd);
 
-	if (duty_ticks_r > prd)
-		duty_ticks_r = prd;
+	duty_ticks_r = duty_ticks_d - 2 * deadtime_ticks;
+
+	if (duty_ticks_r > prd) // overflow
+		duty_ticks_r = 0;
 
 	return duty_ticks_d > old;
 }
 
 bool ConverterBase::has_recessive() const
 {
-	return recessive;
+	return hasrecessive;
 }
 
 //
 //
 
-FullBridge::FullBridge(BuckConverter &i, BoostConverter &o) : bck(i), bst(o)
+BuckBoostConverter::BuckBoostConverter(BuckConverter &i, BoostConverter &o) : bck(i), bst(o)
 {
 }
 
-FullBridge::~FullBridge()
+BuckBoostConverter::~BuckBoostConverter()
 {
 }
 
-esp_err_t FullBridge::set_ratio(float ratio)
+esp_err_t BuckBoostConverter::init()
+{
+	return ESP_OK;
+}
+
+esp_err_t BuckBoostConverter::deinit()
+{
+	return ESP_OK;
+}
+
+//
+
+esp_err_t BuckBoostConverter::set_ratio(float ratio)
 {
 	ratio = std::clamp(ratio, 0.0f, 10.0f);
 
@@ -516,7 +550,7 @@ esp_err_t FullBridge::set_ratio(float ratio)
 	return ESP_OK;
 }
 
-esp_err_t FullBridge::force_off()
+esp_err_t BuckBoostConverter::force_off()
 {
 	ESP_RETURN_ON_ERROR(
 		bck.force_off(),
@@ -529,7 +563,7 @@ esp_err_t FullBridge::force_off()
 	return ESP_OK;
 }
 
-esp_err_t FullBridge::force_pass()
+esp_err_t BuckBoostConverter::force_pass()
 {
 	ESP_RETURN_ON_ERROR(
 		bck.force_pass(),
@@ -542,7 +576,7 @@ esp_err_t FullBridge::force_pass()
 	return ESP_OK;
 }
 
-esp_err_t FullBridge::force_freewheel()
+esp_err_t BuckBoostConverter::force_freewheel()
 {
 	ESP_RETURN_ON_ERROR(
 		bck.force_freewheel(),
