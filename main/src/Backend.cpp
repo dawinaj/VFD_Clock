@@ -13,38 +13,31 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <driver/spi_master.h>
+#include <driver/i2c_master.h>
 #include <driver/gpio.h>
 
 #include "Communicator.h"
 
-#include "Converter.h"
-
-#include "MCP3x0x.h"
+#include "MCP230XX.h"
 
 namespace Backend
 {
 	namespace
 	{
-		constexpr uint32_t slowdown = 1000;
-		constexpr uint32_t dtsd = 10;
-		// SPECSs
-		constexpr int MCPWM_GRP = 0;
-		constexpr uint32_t CLK_FRQ = 160'000'000 / slowdown; // 80MHz max?
-		constexpr uint32_t PWM_FRQ = 100'000 / slowdown;	 // somewhere around 30k-300k, affects duty precision, response, losses, etc
-		constexpr uint32_t DTNS = 100 * slowdown * dtsd;	 // dead time in ns
+		constexpr uint32_t TIMER_HZ = 1'000'000;
+		constexpr uint32_t CTRL_LOOP_TICKS = 1'000;
+		constexpr float SAMPLING_S = float(CTRL_LOOP_TICKS) / TIMER_HZ; // us to s
 
-		constexpr uint32_t CTRL_US = 100;
-		constexpr float SAMPLING_S = CTRL_US / 1e6; // us to s
+		constexpr uint32_t i2c_chz = 800'000;
 
 		// HARDWARE
 		constexpr spi_host_device_t spi_host = SPI3_HOST;
+		i2c_master_bus_handle_t i2c_hdl;
 
-		McpwmTimer mcpwm_timer(MCPWM_GRP, CLK_FRQ, CLK_FRQ / PWM_FRQ);
-		BuckConverter buck_conv(mcpwm_timer, GPIO_NUM_25, GPIO_NUM_26, DTNS);
-		BoostConverter boost_conv(mcpwm_timer, GPIO_NUM_32, GPIO_NUM_33, DTNS);
-		BuckBoostConverter conv(buck_conv, boost_conv);
+		MCP23017 expander_grids(i2c_hdl, 0b000, i2c_chz);
+		MCP23017 expander_anodes(i2c_hdl, 0b100, i2c_chz);
 
-		MCP3204 adc(spi_host, GPIO_NUM_5, 2'000'000);
+		constexpr gpio_num_t filament_pin = GPIO_NUM_17;
 
 		//================================//
 		//            HELPERS             //
@@ -60,8 +53,6 @@ namespace Backend
 
 		// CONSTANTS
 
-		// I/O conversion
-		constexpr int32_t halfrangein = adc.ref / 2;
 	}
 
 	//================================//
@@ -76,34 +67,82 @@ namespace Backend
 	//    HELPERS     //
 	//----------------//
 
-	static inline constexpr int32_t adc_offset(MCP3204::out_t val)
+	static esp_err_t vfd_for_for()
 	{
-		return static_cast<int32_t>(val) - halfrangein;
+		static size_t grid = 0;
+		static size_t anode = 0;
+
+		ESP_RETURN_ON_ERROR(
+			expander_grids.set_pins(BIT(grid)),
+			TAG, "Failed to expander_grids.set_pins!");
+
+		ESP_RETURN_ON_ERROR(
+			expander_anodes.set_pins(BIT(anode)),
+			TAG, "Failed to expander_anodes.set_pins!");
+
+		if (++anode == 16)
+		{
+			anode = 0;
+			if (++grid == 16)
+				grid = 0;
+		}
+
+		return ESP_OK;
 	}
 
-	// template <typename num_t, int32_t mul = 1>
-	// static num_t bin_to_phy(int32_t sum, int32_t cnt)
-	// {
-	// 	constexpr num_t ratio = u_ref * mul / halfrangein;
-	//
-	// 	size_t inidx = static_cast<size_t>(in) - 1;
-	// 	size_t rngidx = static_cast<size_t>(an_in_range[inidx]);
-	// 	switch (in)
-	// 	{
-	// 	case Input::In1:
-	// 	case Input::In2:
-	// 	case Input::In3:
-	// 		return sum * ratio * volt_divs[rngidx] / cnt;
-	// 	case Input::In4:
-	// 		return sum * ratio / curr_gains[rngidx] / cnt * ItoU_input;
-	// 	default:
-	// 		return 0;
-	// 	}
-	// }
+	static esp_err_t vfd_for_all()
+	{
+		static size_t grid = 0;
+
+		ESP_RETURN_ON_ERROR(
+			expander_grids.set_pins(0),
+			TAG, "Failed to expander_grids.set_pins!");
+
+		ESP_RETURN_ON_ERROR(
+			expander_anodes.set_pins(-1),
+			TAG, "Failed to expander_anodes.set_pins!");
+
+		ESP_RETURN_ON_ERROR(
+			expander_grids.set_pins(BIT(grid)),
+			TAG, "Failed to expander_grids.set_pins!");
+
+		++grid;
+		grid &= 0b1111;
+
+		return ESP_OK;
+	}
+
+	static esp_err_t vfd_all_all()
+	{
+		ESP_RETURN_ON_ERROR(
+			expander_grids.set_pins(-1),
+			TAG, "Failed to expander_grids.set_pins!");
+
+		ESP_RETURN_ON_ERROR(
+			expander_anodes.set_pins(-1),
+			TAG, "Failed to expander_anodes.set_pins!");
+
+		return ESP_OK;
+	}
+
+	static esp_err_t vfd_none()
+	{
+		ESP_RETURN_ON_ERROR(
+			expander_grids.set_pins(0),
+			TAG, "Failed to expander_grids.set_pins!");
+
+		ESP_RETURN_ON_ERROR(
+			expander_anodes.set_pins(0),
+			TAG, "Failed to expander_anodes.set_pins!");
+
+		return ESP_OK;
+	}
 
 	//----------------//
 	//    BACKEND     //
 	//----------------//
+
+	static esp_err_t init_gptimer();
 
 	// INTERRUPT
 
@@ -121,43 +160,40 @@ namespace Backend
 	static void controlloop_task(void *arg)
 	{
 		__attribute__((unused)) esp_err_t ret; // used in on_false macros
-
-		int d = 0;
+		uint32_t cycles = 0;
 
 		ESP_LOGI(TAG, "Starting the Control loop...");
 
-		mcpwm_timer.start();
+		ESP_GOTO_ON_ERROR(
+			init_gptimer(),
+			label_fail, TAG, "Failed to init_gptimer!");
 
 		ESP_GOTO_ON_ERROR(
 			gptimer_start(sync_timer),
 			label_fail, TAG, "Failed to gptimer_start!");
 
-		vTaskDelay(pdMS_TO_TICKS(500));
+		// vTaskDelay(pdMS_TO_TICKS(500));
 
-		while (d <= 100)
+		filament_state(true);
+
+		while (1)
 		{
-			uint32_t cycles = ulTaskNotifyTake(pdTRUE, 0);
-
+			cycles = ulTaskNotifyTake(pdTRUE, 0);
 			while (ulTaskNotifyTake(pdTRUE, portMAX_DELAY) == 0)
 				;
-
 			++cycles;
+			// float DT = cycles * SAMPLING_S;
 
-			float DT = cycles * SAMPLING_S;
+			// if (DT < 1.0f)
+			vfd_for_all();
+			// else
+			// vfd_none();
 
-			conv.set_ratio(d++ * 0.01f);
-			// boost_conv.set_duty(0.4);
-
-			// ESP_LOGI(TAG, "Cycles: %lu, Time: %f", cycles, DT);
-
-			vTaskDelay(pdMS_TO_TICKS(100));
+			// if (DT > 2.0f)
+			// cycles = 0;
 		}
 
 	label_fail:
-
-		mcpwm_timer.stop();
-
-		conv.force_freewheel();
 
 		gptimer_stop(sync_timer);
 
@@ -166,11 +202,65 @@ namespace Backend
 
 		ctrlloop_task = nullptr;
 		vTaskDelete(ctrlloop_task);
+		// *dies*
 	}
 
 	//----------------//
 	//    HELPERS     //
 	//----------------//
+
+	static esp_err_t init_gpio()
+	{
+		ESP_RETURN_ON_ERROR(
+			gpio_set_direction(filament_pin, GPIO_MODE_OUTPUT),
+			TAG, "Failed to gpio_set_direction!");
+
+		ESP_RETURN_ON_ERROR(
+			gpio_set_level(filament_pin, 1),
+			TAG, "Failed to gpio_set_level!");
+
+		return ESP_OK;
+	}
+	static esp_err_t deinit_gpio()
+	{
+		ESP_RETURN_ON_ERROR(
+			gpio_reset_pin(filament_pin),
+			TAG, "Failed to gpio_reset_pin!");
+
+		return ESP_OK;
+	}
+
+	static esp_err_t init_i2c()
+	{
+		i2c_master_bus_config_t bus_cfg = {
+			.i2c_port = -1,
+			.sda_io_num = GPIO_NUM_21,
+			.scl_io_num = GPIO_NUM_22,
+			.clk_source = I2C_CLK_SRC_DEFAULT,
+			.glitch_ignore_cnt = 7,
+			.intr_priority = 0,
+			.trans_queue_depth = 0,
+			.flags = {
+				.enable_internal_pullup = false,
+			},
+		};
+
+		ESP_RETURN_ON_ERROR(
+			i2c_new_master_bus(&bus_cfg, &i2c_hdl),
+			TAG, "Failed to i2c_new_master_bus!");
+
+		return ESP_OK;
+	}
+	static esp_err_t deinit_i2c()
+	{
+		ESP_RETURN_ON_ERROR(
+			i2c_del_master_bus(i2c_hdl),
+			TAG, "Failed to i2c_del_master_bus!");
+
+		i2c_hdl = nullptr;
+
+		return ESP_OK;
+	}
 
 	static esp_err_t init_spi()
 	{
@@ -205,49 +295,20 @@ namespace Backend
 		return ESP_OK;
 	}
 
-	static esp_err_t init_adc()
-	{
-		// ADC/DAC
-		// for (size_t i = 0; i < an_in_num; ++i)
-		// 	trx_adc[i] = MCP3204::make_trx(i);
-
-		ESP_RETURN_ON_ERROR(
-			adc.init(),
-			TAG, "Failed to adc.init!");
-
-		ESP_RETURN_ON_ERROR(
-			adc.acquire_spi(),
-			TAG, "Failed to adc.acquire_spi!");
-
-		return ESP_OK;
-	}
-	static esp_err_t deinit_adc()
-	{
-		ESP_RETURN_ON_ERROR(
-			adc.release_spi(),
-			TAG, "Failed to adc.release_spi!");
-
-		ESP_RETURN_ON_ERROR(
-			adc.deinit(),
-			TAG, "Failed to adc.deinit!");
-
-		return ESP_OK;
-	}
-
 	static esp_err_t init_gptimer()
 	{
 		const gptimer_config_t timer_cfg = {
 			.clk_src = GPTIMER_CLK_SRC_DEFAULT,
 			.direction = GPTIMER_COUNT_UP,
-			.resolution_hz = 1'000'000, // 1MHz, 1 tick = 1us
-			.intr_priority = 0,			// auto default
+			.resolution_hz = TIMER_HZ, // 1MHz, 1 tick = 1us
+			.intr_priority = 0,		   // auto default
 			.flags = {
 				.intr_shared = false,
 			},
 		};
 
 		const gptimer_alarm_config_t alarm_cfg = {
-			.alarm_count = CTRL_US,
+			.alarm_count = CTRL_LOOP_TICKS,
 			.reload_count = 0,
 			.flags = {
 				.auto_reload_on_alarm = true,
@@ -291,47 +352,6 @@ namespace Backend
 		return ESP_OK;
 	}
 
-	static esp_err_t init_bridge()
-	{
-		ESP_RETURN_ON_ERROR(
-			mcpwm_timer.init(),
-			TAG, "Failed to mcpwm_timer.init!");
-
-		ESP_RETURN_ON_ERROR(
-			buck_conv.init(),
-			TAG, "Failed to buck_conv.init!");
-
-		ESP_RETURN_ON_ERROR(
-			boost_conv.init(),
-			TAG, "Failed to boost_conv.init!");
-
-		ESP_RETURN_ON_ERROR(
-			conv.init(),
-			TAG, "Failed to conv.init!");
-
-		return ESP_OK;
-	}
-	static esp_err_t deinit_bridge()
-	{
-		ESP_RETURN_ON_ERROR(
-			conv.deinit(),
-			TAG, "Failed to conv.deinit!");
-
-		ESP_RETURN_ON_ERROR(
-			boost_conv.deinit(),
-			TAG, "Failed to boost_conv.deinit!");
-
-		ESP_RETURN_ON_ERROR(
-			buck_conv.deinit(),
-			TAG, "Failed to buck_conv.deinit!");
-
-		ESP_RETURN_ON_ERROR(
-			mcpwm_timer.deinit(),
-			TAG, "Failed to mcpwm_timer.deinit!");
-
-		return ESP_OK;
-	}
-
 	static esp_err_t init_task()
 	{
 		ESP_RETURN_ON_FALSE(
@@ -348,33 +368,67 @@ namespace Backend
 		return ESP_OK;
 	}
 
+	static esp_err_t init_expanders()
+	{
+		ESP_RETURN_ON_ERROR(
+			expander_grids.init(),
+			TAG, "Failed to expander_grids.init!");
+
+		ESP_RETURN_ON_ERROR(
+			expander_anodes.init(),
+			TAG, "Failed to expander_anodes.init!");
+
+		ESP_RETURN_ON_ERROR(
+			expander_grids.set_direction(0x0000),
+			TAG, "Failed to expander_grids.set_direction!");
+
+		ESP_RETURN_ON_ERROR(
+			expander_anodes.set_direction(0x0000),
+			TAG, "Failed to expander_anodes.set_direction!");
+
+		return ESP_OK;
+	}
+	static esp_err_t deinit_expanders()
+	{
+		ESP_RETURN_ON_ERROR(
+			expander_grids.deinit(),
+			TAG, "Failed to expander_grids.deinit!");
+
+		ESP_RETURN_ON_ERROR(
+			expander_anodes.deinit(),
+			TAG, "Failed to expander_anodes.deinit!");
+
+		return ESP_OK;
+
+		return ESP_OK;
+	}
+
 	//----------------//
 	//    FRONTEND    //
 	//----------------//
+
+	esp_err_t filament_state(bool on)
+	{
+		ESP_RETURN_ON_ERROR(
+			gpio_set_level(filament_pin, on),
+			TAG, "Failed to gpio_set_level!");
+
+		return ESP_OK;
+	}
 
 	esp_err_t init()
 	{
 		ESP_LOGI(TAG, "Initing Board...");
 
-		// // GPIO
-		// for (size_t i = 0; i < dg_in_num; ++i)
-		// {
-		// 	gpio_set_direction(dig_in[i], GPIO_MODE_INPUT);
-		// 	gpio_pulldown_en(dig_in[i]);
-		// }
+		init_gpio();
 
-		// for (size_t i = 0; i < dg_out_num; ++i)
-		// 	gpio_set_direction(dig_out[i], GPIO_MODE_OUTPUT);
-
-		// INIT ADC
+		init_i2c();
 		init_spi();
-		init_adc();
+
+		init_expanders();
 
 		// SPAWN GPTIMER
-		init_gptimer();
-
-		// INIT BRIDGE
-		init_bridge();
+		// init_gptimer();
 
 		vTaskDelay(pdMS_TO_TICKS(500));
 
@@ -392,15 +446,15 @@ namespace Backend
 		// KILL EXE TASK
 		deinit_task();
 
-		// DEINIT BRIDGE
-		deinit_bridge();
-
 		// KILL GPTIMER
-		deinit_gptimer();
+		// deinit_gptimer();
 
-		// DEINIT ADC
-		deinit_adc();
+		deinit_expanders();
+
 		deinit_spi();
+		deinit_i2c();
+
+		deinit_gpio();
 
 		ESP_LOGI(TAG, "Done!");
 		return ESP_OK;

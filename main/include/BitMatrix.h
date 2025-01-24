@@ -573,9 +573,9 @@ public:
 	using row_t = std::array<T, W>;
 	using this_t = Matrix<T, H, W>;
 	using this_bool_t = BitMatrix<H, W>;
-	using crd_t = MinUInt<std::max(H, W)>;
-	using idx_t = MinUInt<H * W>;
-	using sum_t = FastSum<H * W, T>;
+	using crd_t = size_t;
+	using idx_t = size_t;
+	using sum_t = elem_t; // FastSum<H * W, T>;
 	class iterator;
 	class const_iterator;
 

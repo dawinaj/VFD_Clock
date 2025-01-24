@@ -9,7 +9,7 @@
 
 // PERMANENT INCLUDES
 
-#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+#define LOG_LOCAL_LEVEL ESP_LOG_INFO
 #include <esp_log.h>
 #include <esp_err.h>
 #include <esp_check.h>

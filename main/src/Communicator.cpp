@@ -6,10 +6,6 @@ namespace Communicator
 	{
 		std::atomic_bool please_exit;
 		std::atomic_bool producer_running;
-
-		// SETTINGS
-		Electricity limits;
-		Electricity operating;
 	}
 
 	//================================//
@@ -40,18 +36,6 @@ namespace Communicator
 			cleanup(),
 			TAG, "Failed to cleanup!");
 
-		return ESP_OK;
-	}
-
-	esp_err_t set_limits(Electricity &e)
-	{
-		limits = e;
-		return ESP_OK;
-	}
-
-	esp_err_t set_operating(Electricity &e)
-	{
-		operating = e;
 		return ESP_OK;
 	}
 
