@@ -301,7 +301,7 @@ namespace Backend
 			.clk_src = GPTIMER_CLK_SRC_DEFAULT,
 			.direction = GPTIMER_COUNT_UP,
 			.resolution_hz = TIMER_HZ, // 1MHz, 1 tick = 1us
-			.intr_priority = 0,		   // auto default
+			.intr_priority = 3,		   // 0 auto default
 			.flags = {
 				.intr_shared = false,
 			},
