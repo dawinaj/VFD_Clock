@@ -185,18 +185,19 @@ namespace SegmentDisplay
 		case 'T':
 			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperCenter | ET::LowerCenter;
 		case 'U':
-
+			return static_cast<T>(0) | | ET::UpperRight | ET::LowerRight | ET::BottomLeft | ET::BottomRight | ET::LowerLeft | ET::UpperLeft;
 		//
 		case 'V':
-
+			return static_cast<T>(0) | ET::LowerLeft | ET::UpperLeft | ET::DiagLowerLeft | ET::DiagUpperRight;
 		case 'W':
-
+			return static_cast<T>(0) | ET::UpperRight | ET::LowerRight | ET::LowerLeft | ET::UpperLeft | ET::DiagLowerRight | ET::DiagLowerLeft;
 		case 'X':
-
+			return static_cast<T>(0) | ET::DiagUpperRight | ET::DiagLowerRight | ET::DiagLowerLeft | ET::DiagUpperLeft;
 		case 'Y':
-
+			return static_cast<T>(0) | ET::DiagUpperRight | ET::DiagUpperLeft | ET::LowerCenter;
 		case 'Z':
-
+			return static_cast<T>(0) ET::TopLeft | ET::TopRight | ET::DiagUpperRight | ET::DiagLowerLeft | ET::BottomLeft | ET::BottomRight;
+		
 		default:
 			return 0; // Unknown character, return static_cast<T>(0) |  0 (no segments on
 		}
