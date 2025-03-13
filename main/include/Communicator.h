@@ -4,14 +4,14 @@
 #include <atomic>
 #include <utility>
 
-#include "BitMatrix.h"
+#include "VFD.h"
 
 namespace Communicator
 {
 	constexpr const char *const TAG = "Communicator";
 
-	// BitMatrix<16, 16> elements;
-	//
+	VFD &get_vfd();
+
 	esp_err_t init();
 	esp_err_t deinit();
 

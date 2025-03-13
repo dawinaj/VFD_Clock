@@ -3,6 +3,8 @@
 
 #include <cstdint>
 
+#include <vector>
+
 // Enum-like structure defining the 7-segment display segments
 
 namespace SegmentDisplay
@@ -49,59 +51,49 @@ namespace SegmentDisplay
 	template <typename ET = Default7Segment, typename T = uint8_t>
 	constexpr T char_to_7seg(char c)
 	{
-		static_assert(std::is_integral<T>::value, "Return type must be an integer");
-		// static_assert(std::is_unsigned<T>::value, "Return type must be unsigned");
-
-		inline constexpr T operator|(T aggr, ET seg)
-		{
-			// return aggr | static_cast<T>(1 << static_cast<std::underlying_type_t>(seg));
-			return aggr | static_cast<T>(seg);
-		}
+		c = std::toupper((unsigned char)c);
 
 		switch (c)
 		{
 		case '0':
-			return static_cast<T>(0) | ET::Top | ET::UpperRight | ET::LowerRight | ET::Bottom | ET::LowerLeft | ET::UpperLeft;
+			return custom_char_seg<ET, T>({ET::Top, ET::UpperRight, ET::LowerRight, ET::Bottom, ET::LowerLeft, ET::UpperLeft});
 		case '1':
-			return static_cast<T>(0) | ET::UpperRight | ET::LowerRight;
+			return custom_char_seg<ET, T>({ET::UpperRight, ET::LowerRight});
 		case '2':
-			return static_cast<T>(0) | ET::Top | ET::UpperRight | ET::Middle | ET::LowerLeft | ET::Bottom;
+			return custom_char_seg<ET, T>({ET::Top, ET::UpperRight, ET::Middle, ET::LowerLeft, ET::Bottom});
 		case '3':
-			return static_cast<T>(0) | ET::Top | ET::UpperRight | ET::Middle | ET::LowerRight | ET::Bottom;
+			return custom_char_seg<ET, T>({ET::Top, ET::UpperRight, ET::Middle, ET::LowerRight, ET::Bottom});
 		case '4':
-			return static_cast<T>(0) | ET::UpperLeft | ET::Middle | ET::UpperRight | ET::LowerRight;
+			return custom_char_seg<ET, T>({ET::UpperLeft, ET::Middle, ET::UpperRight, ET::LowerRight});
 		case '5':
-			return static_cast<T>(0) | ET::Top | ET::UpperLeft | ET::Middle | ET::LowerRight | ET::Bottom;
+			return custom_char_seg<ET, T>({ET::Top, ET::UpperLeft, ET::Middle, ET::LowerRight, ET::Bottom});
 		case '6':
-			return static_cast<T>(0) | ET::Top | ET::UpperLeft | ET::Middle | ET::LowerLeft | ET::LowerRight | ET::Bottom;
+			return custom_char_seg<ET, T>({ET::Top, ET::UpperLeft, ET::Middle, ET::LowerLeft, ET::LowerRight, ET::Bottom});
 		case '7':
-			return static_cast<T>(0) | ET::Top | ET::UpperRight | ET::LowerRight;
+			return custom_char_seg<ET, T>({ET::Top, ET::UpperRight, ET::LowerRight});
 		case '8':
-			return static_cast<T>(0) | ET::Top | ET::UpperRight | ET::LowerRight | ET::Bottom | ET::LowerLeft | ET::UpperLeft | ET::Middle;
+			return custom_char_seg<ET, T>({ET::Top, ET::UpperRight, ET::LowerRight, ET::Bottom, ET::LowerLeft, ET::UpperLeft, ET::Middle});
 		case '9':
-			return static_cast<T>(0) | ET::Top | ET::UpperRight | ET::LowerRight | ET::Bottom | ET::UpperLeft | ET::Middle;
+			return custom_char_seg<ET, T>({ET::Top, ET::UpperRight, ET::LowerRight, ET::Bottom, ET::UpperLeft, ET::Middle});
 
 		case 'A':
-		case 'a':
-			return static_cast<T>(0) | ET::Top | ET::UpperRight | ET::LowerRight | ET::LowerLeft | ET::UpperLeft | ET::Middle;
+			return custom_char_seg<ET, T>({ET::Top, ET::UpperRight, ET::LowerRight, ET::LowerLeft, ET::UpperLeft, ET::Middle});
 		case 'B':
-		case 'b':
-			return static_cast<T>(0) | ET::LowerRight | ET::Bottom | ET::LowerLeft | ET::UpperLeft | ET::Middle;
+			return custom_char_seg<ET, T>({ET::LowerRight, ET::Bottom, ET::LowerLeft, ET::UpperLeft, ET::Middle});
 		case 'C':
-		case 'c':
-			return static_cast<T>(0) | ET::Top | ET::Bottom | ET::LowerLeft | ET::UpperLeft;
+			return custom_char_seg<ET, T>({ET::Top, ET::Bottom, ET::LowerLeft, ET::UpperLeft});
 		case 'D':
-		case 'd':
-			return static_cast<T>(0) | ET::UpperRight | ET::LowerRight | ET::Bottom | ET::LowerLeft | ET::Middle;
+			return custom_char_seg<ET, T>({ET::UpperRight, ET::LowerRight, ET::Bottom, ET::LowerLeft, ET::Middle});
 		case 'E':
-		case 'e':
-			return static_cast<T>(0) | ET::Top | ET::Bottom | ET::LowerLeft | ET::UpperLeft | ET::Middle;
+			return custom_char_seg<ET, T>({ET::Top, ET::Bottom, ET::LowerLeft, ET::UpperLeft, ET::Middle});
 		case 'F':
-		case 'f':
-			return static_cast<T>(0) | ET::Top | ET::LowerLeft | ET::UpperLeft | ET::Middle;
+			return custom_char_seg<ET, T>({ET::Top, ET::LowerLeft, ET::UpperLeft, ET::Middle});
+
+		case ' ':
+			return custom_char_seg<ET, T>({});
 
 		default:
-			return 0; // Unknown character, return static_cast<T>(0) |  0 (no segments on
+			return 0; // Unknown character, return custom_char_seg<ET, T>({ 0 (no segments on
 		}
 	}
 
@@ -109,98 +101,109 @@ namespace SegmentDisplay
 	template <typename ET = Default16Segment, typename T = uint16_t>
 	constexpr T char_to_16seg(char c)
 	{
-		static_assert(std::is_integral<T>::value, "Return type must be an integer");
-		// static_assert(std::is_unsigned<T>::value, "Return type must be unsigned");
-
-		inline constexpr T operator|(T aggr, ET seg)
-		{
-			// return aggr | static_cast<T>(1 << static_cast<std::underlying_type_t>(seg));
-			return aggr | static_cast<T>(seg);
-		}
+		c = std::toupper((unsigned char)c);
 
 		switch (c)
 		{
 		case '0':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperRight | ET::LowerRight | ET::BottomLeft | ET::BottomRight | ET::LowerLeft | ET::UpperLeft;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::UpperRight, ET::LowerRight, ET::BottomLeft, ET::BottomRight, ET::LowerLeft, ET::UpperLeft});
 		case '1':
-			return static_cast<T>(0) | ET::UpperRight | ET::LowerRight;
+			return custom_char_seg<ET, T>({ET::UpperRight, ET::LowerRight});
 		case '2':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperRight | ET::MiddleLeft | ET::MiddleRight | ET::LowerLeft | ET::BottomLeft | ET::BottomRight;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::UpperRight, ET::MiddleLeft, ET::MiddleRight, ET::LowerLeft, ET::BottomLeft, ET::BottomRight});
 		case '3':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperRight | ET::MiddleLeft | ET::MiddleRight | ET::LowerRight | ET::BottomLeft | ET::BottomRight;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::UpperRight, ET::MiddleLeft, ET::MiddleRight, ET::LowerRight, ET::BottomLeft, ET::BottomRight});
 		case '4':
-			return static_cast<T>(0) | ET::UpperLeft | ET::MiddleLeft | ET::MiddleRight | ET::UpperRight | ET::LowerRight;
+			return custom_char_seg<ET, T>({ET::UpperLeft, ET::MiddleLeft, ET::MiddleRight, ET::UpperRight, ET::LowerRight});
 		case '5':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperLeft | ET::MiddleLeft | ET::MiddleRight | ET::LowerRight | ET::BottomLeft | ET::BottomRight;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::UpperLeft, ET::MiddleLeft, ET::MiddleRight, ET::LowerRight, ET::BottomLeft, ET::BottomRight});
 		case '6':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperLeft | ET::MiddleLeft | ET::MiddleRight | ET::LowerLeft | ET::LowerRight | ET::BottomLeft | ET::BottomRight;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::UpperLeft, ET::MiddleLeft, ET::MiddleRight, ET::LowerLeft, ET::LowerRight, ET::BottomLeft, ET::BottomRight});
 		case '7':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperRight | ET::LowerRight;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::UpperRight, ET::LowerRight});
 		case '8':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperRight | ET::LowerRight | ET::BottomLeft | ET::BottomRight | ET::LowerLeft | ET::UpperLeft | ET::MiddleLeft | ET::MiddleRight;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::UpperRight, ET::LowerRight, ET::BottomLeft, ET::BottomRight, ET::LowerLeft, ET::UpperLeft, ET::MiddleLeft, ET::MiddleRight});
 		case '9':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperRight | ET::LowerRight | ET::BottomLeft | ET::BottomRight | ET::UpperLeft | ET::MiddleLeft | ET::MiddleRight;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::UpperRight, ET::LowerRight, ET::BottomLeft, ET::BottomRight, ET::UpperLeft, ET::MiddleLeft, ET::MiddleRight});
 
 		case 'A':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperRight | ET::LowerRight | ET::LowerLeft | ET::UpperLeft | ET::MiddleLeft | ET::MiddleRight;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::UpperRight, ET::LowerRight, ET::LowerLeft, ET::UpperLeft, ET::MiddleLeft, ET::MiddleRight});
 		case 'B':
-			return static_cast<T>(0) | ET::LowerRight | ET::BottomLeft | ET::BottomRight | ET::LowerLeft | ET::UpperLeft | ET::MiddleLeft | ET::MiddleRight;
+			return custom_char_seg<ET, T>({ET::LowerRight, ET::BottomLeft, ET::BottomRight, ET::LowerLeft, ET::UpperLeft, ET::MiddleLeft, ET::MiddleRight});
 		case 'C':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::BottomLeft | ET::BottomRight | ET::LowerLeft | ET::UpperLeft;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::BottomLeft, ET::BottomRight, ET::LowerLeft, ET::UpperLeft});
 		case 'D':
-			return static_cast<T>(0) | ET::UpperRight | ET::LowerRight | ET::BottomLeft | ET::BottomRight | ET::LowerLeft | ET::MiddleLeft | ET::MiddleRight;
+			return custom_char_seg<ET, T>({ET::UpperRight, ET::LowerRight, ET::BottomLeft, ET::BottomRight, ET::LowerLeft, ET::MiddleLeft, ET::MiddleRight});
 		case 'E':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::BottomLeft | ET::BottomRight | ET::LowerLeft | ET::UpperLeft | ET::MiddleLeft | ET::MiddleRight;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::BottomLeft, ET::BottomRight, ET::LowerLeft, ET::UpperLeft, ET::MiddleLeft, ET::MiddleRight});
 		case 'F':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::LowerLeft | ET::UpperLeft | ET::MiddleLeft | ET::MiddleRight;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::LowerLeft, ET::UpperLeft, ET::MiddleLeft, ET::MiddleRight});
 
 		case 'G':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperLeft | ET::MiddleRight | ET::LowerLeft | ET::LowerRight | ET::BottomLeft | ET::BottomRight;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::UpperLeft, ET::MiddleRight, ET::LowerLeft, ET::LowerRight, ET::BottomLeft, ET::BottomRight});
 		case 'H':
-			return static_cast<T>(0) | ET::UpperRight | ET::LowerRight | ET::LowerLeft | ET::UpperLeft | ET::MiddleLeft | ET::MiddleRight;
+			return custom_char_seg<ET, T>({ET::UpperRight, ET::LowerRight, ET::LowerLeft, ET::UpperLeft, ET::MiddleLeft, ET::MiddleRight});
 		case 'I':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperCenter | ET::LowerCenter | ET::BottomLeft | ET::BottomRight;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::UpperCenter, ET::LowerCenter, ET::BottomLeft, ET::BottomRight});
 		case 'J':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperRight | ET::LowerRight | ET::BottomLeft | ET::BottomRight;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::UpperRight, ET::LowerRight, ET::BottomLeft, ET::BottomRight});
 		case 'K':
-			return static_cast<T>(0) | ET::LowerLeft | ET::UpperLeft | ET::MiddleLeft | ET::DiagUpperRight | ET::DiagLowerRight;
+			return custom_char_seg<ET, T>({ET::LowerLeft, ET::UpperLeft, ET::MiddleLeft, ET::DiagUpperRight, ET::DiagLowerRight});
 
 		case 'L':
-			return static_cast<T>(0) | ET::BottomLeft | ET::BottomRight | ET::LowerLeft | ET::UpperLeft;
+			return custom_char_seg<ET, T>({ET::BottomLeft, ET::BottomRight, ET::LowerLeft, ET::UpperLeft});
 		case 'M':
-			return static_cast<T>(0) | ET::UpperRight | ET::LowerRight | ET::LowerLeft | ET::UpperLeft | ET::DiagUpperRight | ET::DiagUpperLeft;
+			return custom_char_seg<ET, T>({ET::UpperRight, ET::LowerRight, ET::LowerLeft, ET::UpperLeft, ET::DiagUpperRight, ET::DiagUpperLeft});
 		case 'N':
-			return static_cast<T>(0) | ET::UpperRight | ET::LowerRight | ET::LowerLeft | ET::UpperLeft | ET::DiagLowerRight | ET::DiagUpperLeft;
+			return custom_char_seg<ET, T>({ET::UpperRight, ET::LowerRight, ET::LowerLeft, ET::UpperLeft, ET::DiagLowerRight, ET::DiagUpperLeft});
 		case 'O':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperRight | ET::LowerRight | ET::BottomLeft | ET::BottomRight | ET::LowerLeft | ET::UpperLeft;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::UpperRight, ET::LowerRight, ET::BottomLeft, ET::BottomRight, ET::LowerLeft, ET::UpperLeft});
 		case 'P':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperRight | ET::LowerLeft | ET::UpperLeft | ET::MiddleLeft | ET::MiddleRight;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::UpperRight, ET::LowerLeft, ET::UpperLeft, ET::MiddleLeft, ET::MiddleRight});
 
 		case 'Q':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperRight | ET::LowerRight | ET::BottomLeft | ET::BottomRight | ET::LowerLeft | ET::UpperLeft | ET::DiagLowerRight;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::UpperRight, ET::LowerRight, ET::BottomLeft, ET::BottomRight, ET::LowerLeft, ET::UpperLeft, ET::DiagLowerRight});
 		case 'R':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperRight | ET::LowerLeft | ET::UpperLeft | ET::MiddleLeft | ET::MiddleRight | ET::DiagLowerRight;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::UpperRight, ET::LowerLeft, ET::UpperLeft, ET::MiddleLeft, ET::MiddleRight, ET::DiagLowerRight});
 		case 'S':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::DiagUpperLeft | ET::MiddleLeft | ET::MiddleRight | ET::LowerRight | ET::BottomLeft | ET::BottomRight;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::DiagUpperLeft, ET::MiddleLeft, ET::MiddleRight, ET::LowerRight, ET::BottomLeft, ET::BottomRight});
 		case 'T':
-			return static_cast<T>(0) | ET::TopLeft | ET::TopRight | ET::UpperCenter | ET::LowerCenter;
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::UpperCenter, ET::LowerCenter});
 		case 'U':
-			return static_cast<T>(0) | | ET::UpperRight | ET::LowerRight | ET::BottomLeft | ET::BottomRight | ET::LowerLeft | ET::UpperLeft;
+			return custom_char_seg<ET, T>({ | ET::UpperRight, ET::LowerRight, ET::BottomLeft, ET::BottomRight, ET::LowerLeft, ET::UpperLeft});
 		//
 		case 'V':
-			return static_cast<T>(0) | ET::LowerLeft | ET::UpperLeft | ET::DiagLowerLeft | ET::DiagUpperRight;
+			return custom_char_seg<ET, T>({ET::LowerLeft, ET::UpperLeft, ET::DiagLowerLeft, ET::DiagUpperRight});
 		case 'W':
-			return static_cast<T>(0) | ET::UpperRight | ET::LowerRight | ET::LowerLeft | ET::UpperLeft | ET::DiagLowerRight | ET::DiagLowerLeft;
+			return custom_char_seg<ET, T>({ET::UpperRight, ET::LowerRight, ET::LowerLeft, ET::UpperLeft, ET::DiagLowerRight, ET::DiagLowerLeft});
 		case 'X':
-			return static_cast<T>(0) | ET::DiagUpperRight | ET::DiagLowerRight | ET::DiagLowerLeft | ET::DiagUpperLeft;
+			return custom_char_seg<ET, T>({ET::DiagUpperRight, ET::DiagLowerRight, ET::DiagLowerLeft, ET::DiagUpperLeft});
 		case 'Y':
-			return static_cast<T>(0) | ET::DiagUpperRight | ET::DiagUpperLeft | ET::LowerCenter;
+			return custom_char_seg<ET, T>({ET::DiagUpperRight, ET::DiagUpperLeft, ET::LowerCenter});
 		case 'Z':
-			return static_cast<T>(0) ET::TopLeft | ET::TopRight | ET::DiagUpperRight | ET::DiagLowerLeft | ET::BottomLeft | ET::BottomRight;
-		
+			return custom_char_seg<ET, T>({ET::TopLeft, ET::TopRight, ET::DiagUpperRight, ET::DiagLowerLeft, ET::BottomLeft, ET::BottomRight});
+
+		case ' ':
+			return custom_char_seg<ET, T>({});
+
 		default:
-			return 0; // Unknown character, return static_cast<T>(0) |  0 (no segments on
+			return 0; // Unknown character, return 0 (no segments on)
 		}
+	}
+
+	// Function template to create custom char
+	template <typename ET = Default16Segment, typename T = uint16_t>
+	constexpr T custom_char_seg(const std::vector<ET> &segs)
+	{
+		static_assert(std::is_integral<T>::value, "Return type must be an integer");
+		// static_assert(std::is_unsigned<T>::value, "Return type must be unsigned");
+
+		T aggr = 0;
+
+		for (ET seg : segs)
+			aggr |= static_cast<T>(seg);
+
+		return aggr;
 	}
 
 }

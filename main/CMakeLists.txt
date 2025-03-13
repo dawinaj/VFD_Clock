@@ -10,7 +10,7 @@ idf_component_register(
 	"."
 	"include/"
 	REQUIRES
-	nvs_flash lwip esp_netif esp_wifi esp_event wifi_provisioning driver
+	nvs_flash lwip esp_netif esp_wifi esp_event wifi_provisioning driver BME280_SensorAPI
 )
 
 component_compile_options("-std=gnu++2a" "-ffast-math" "-fipa-sra") # "-Wno-maybe-uninitialized"

@@ -55,6 +55,11 @@ public:
 		BAR4_16_20_A,
 	};
 
+	void set_grid(Grids g, uint16_t pattern)
+	{
+		matrix[static_cast<size_t>(g)] = pattern;
+	}
+
 private:
 };
 

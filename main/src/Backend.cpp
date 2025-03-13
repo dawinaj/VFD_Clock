@@ -31,7 +31,6 @@ namespace Backend
 		constexpr uint32_t i2c_chz = 800'000;
 
 		// HARDWARE
-		constexpr spi_host_device_t spi_host = SPI3_HOST;
 		i2c_master_bus_handle_t i2c_hdl;
 
 		MCP23017 expander_grids(i2c_hdl, 0b000, i2c_chz);
@@ -262,39 +261,6 @@ namespace Backend
 		return ESP_OK;
 	}
 
-	static esp_err_t init_spi()
-	{
-		spi_bus_config_t bus_cfg = {
-			.mosi_io_num = GPIO_NUM_23,
-			.miso_io_num = GPIO_NUM_19, // GPIO_NUM_19, GPIO_NUM_NC
-			.sclk_io_num = GPIO_NUM_18,
-			.quadwp_io_num = GPIO_NUM_NC,
-			.quadhd_io_num = GPIO_NUM_NC,
-			.data4_io_num = GPIO_NUM_NC,
-			.data5_io_num = GPIO_NUM_NC,
-			.data6_io_num = GPIO_NUM_NC,
-			.data7_io_num = GPIO_NUM_NC,
-			.max_transfer_sz = 0,
-			.flags = SPICOMMON_BUSFLAG_MASTER,
-			.isr_cpu_id = ESP_INTR_CPU_AFFINITY_AUTO,
-			.intr_flags = 0,
-		};
-
-		ESP_RETURN_ON_ERROR(
-			spi_bus_initialize(spi_host, &bus_cfg, SPI_DMA_DISABLED),
-			TAG, "Failed to spi_bus_initialize!");
-
-		return ESP_OK;
-	}
-	static esp_err_t deinit_spi()
-	{
-		ESP_RETURN_ON_ERROR(
-			spi_bus_free(spi_host),
-			TAG, "Failed to spi_bus_free!");
-
-		return ESP_OK;
-	}
-
 	static esp_err_t init_gptimer()
 	{
 		const gptimer_config_t timer_cfg = {
@@ -416,14 +382,13 @@ namespace Backend
 		return ESP_OK;
 	}
 
-	esp_err_t init()
+	esp_err_t init() // TODO add error checking
 	{
 		ESP_LOGI(TAG, "Initing Board...");
 
 		init_gpio();
 
 		init_i2c();
-		init_spi();
 
 		init_expanders();
 
@@ -451,7 +416,6 @@ namespace Backend
 
 		deinit_expanders();
 
-		deinit_spi();
 		deinit_i2c();
 
 		deinit_gpio();

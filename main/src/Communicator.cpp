@@ -6,6 +6,8 @@ namespace Communicator
 	{
 		std::atomic_bool please_exit;
 		std::atomic_bool producer_running;
+
+		VFD vfd;
 	}
 
 	//================================//
@@ -15,6 +17,11 @@ namespace Communicator
 	//----------------//
 	//    FRONTEND    //
 	//----------------//
+
+	VFD &get_vfd()
+	{
+		return vfd;
+	}
 
 	esp_err_t cleanup()
 	{

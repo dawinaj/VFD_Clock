@@ -8,8 +8,10 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
-// #include <driver/gpio.h>
-#include <driver/i2c_master.h>
+#include <driver/spi_master.h>
+#include <driver/gpio.h>
+
+#include "BME280.h"
 
 #include "Communicator.h"
 
@@ -20,11 +22,9 @@ namespace Frontend
 		// SPECS
 
 		// HARDWARE
+		constexpr spi_host_device_t spi_host = SPI3_HOST;
 
-		i2c_master_bus_handle_t i2c_hdl;
-
-		// HD44780_PCF8574 lcd_comm(i2c_hdl, 0b111, 400000);
-		// HD44780 lcd_disp(&lcd_comm, {4, 20}, LCD_2LINE);
+		BME280_SPI bme(spi_host, GPIO_NUM_2);
 
 	}
 
@@ -36,32 +36,35 @@ namespace Frontend
 	//    BACKEND     //
 	//----------------//
 
-	static esp_err_t init_i2c()
+	static esp_err_t init_spi()
 	{
-		i2c_master_bus_config_t i2c_cfg = {
-			.i2c_port = -1,
-			.sda_io_num = GPIO_NUM_21,
-			.scl_io_num = GPIO_NUM_22,
-			.clk_source = I2C_CLK_SRC_DEFAULT,
-			.glitch_ignore_cnt = 7,
-			.intr_priority = 0,
-			.trans_queue_depth = 0,
-			.flags = {
-				.enable_internal_pullup = true,
-			},
+		spi_bus_config_t bus_cfg = {
+			.mosi_io_num = GPIO_NUM_23,
+			.miso_io_num = GPIO_NUM_19, // GPIO_NUM_19, GPIO_NUM_NC
+			.sclk_io_num = GPIO_NUM_18,
+			.quadwp_io_num = GPIO_NUM_NC,
+			.quadhd_io_num = GPIO_NUM_NC,
+			.data4_io_num = GPIO_NUM_NC,
+			.data5_io_num = GPIO_NUM_NC,
+			.data6_io_num = GPIO_NUM_NC,
+			.data7_io_num = GPIO_NUM_NC,
+			.max_transfer_sz = 0,
+			.flags = SPICOMMON_BUSFLAG_MASTER,
+			.isr_cpu_id = ESP_INTR_CPU_AFFINITY_AUTO,
+			.intr_flags = 0,
 		};
 
 		ESP_RETURN_ON_ERROR(
-			i2c_new_master_bus(&i2c_cfg, &i2c_hdl),
-			TAG, "Failed to i2c_new_master_bus!");
+			spi_bus_initialize(spi_host, &bus_cfg, SPI_DMA_DISABLED),
+			TAG, "Failed to spi_bus_initialize!");
 
 		return ESP_OK;
 	}
-	static esp_err_t deinit_i2c()
+	static esp_err_t deinit_spi()
 	{
 		ESP_RETURN_ON_ERROR(
-			i2c_del_master_bus(i2c_hdl),
-			TAG, "Failed to i2c_del_master_bus!");
+			spi_bus_free(spi_host),
+			TAG, "Failed to spi_bus_free!");
 
 		return ESP_OK;
 	}
