@@ -228,7 +228,7 @@ public:
 
 	//
 
-	esp_err_t measure(Meas &out)
+	esp_err_t measure(Meas &out, bool force_dly = false)
 	{
 		uint8_t status_reg;
 		bme280_data comp_data;
@@ -240,20 +240,23 @@ public:
 				bme280_set_sensor_mode(BME280_POWERMODE_FORCED, &dev),
 				TAG);
 
-		dev.delay_us(period, dev.intf_ptr);
+		if (!continuous || force_dly)
+			dev.delay_us(period, dev.intf_ptr);
 
+		//*/ // throw error if not completed after delay (should not really happen but it was in the original example)
 		BME_RETURN_ON_ERROR(
 			bme280_get_regs(BME280_REG_STATUS, &status_reg, 1, &dev),
 			TAG);
-		if (status_reg & BME280_STATUS_MEAS_DONE) // shouldnt really happen but it was in the original example so whatever
+		if (status_reg & BME280_STATUS_MEAS_DONE)
 			return ESP_ERR_NOT_FINISHED;
-
-		// do // alternatively to throwing error, wait until completion
-		// {
-		// 	BME_RETURN_ON_ERROR(
-		// 		bme280_get_regs(BME280_REG_STATUS, &status_reg, 1, &dev),
-		// 		TAG);
-		// } while (status_reg & BME280_STATUS_MEAS_DONE);
+		/*/ // alternatively to throwing error, wait until completion
+		do
+		{
+			BME_RETURN_ON_ERROR(
+				bme280_get_regs(BME280_REG_STATUS, &status_reg, 1, &dev),
+				TAG);
+		} while (status_reg & BME280_STATUS_MEAS_DONE);
+		//*/
 
 		BME_RETURN_ON_ERROR(
 			bme280_get_sensor_data(BME280_ALL, &comp_data, &dev),

@@ -23,6 +23,28 @@ namespace Communicator
 		return vfd;
 	}
 
+	void request_exit()
+	{
+		please_exit = true;
+	}
+
+	bool should_exit()
+	{
+		return please_exit;
+	}
+
+	void confirm_start()
+	{
+		producer_running = true;
+	}
+	void confirm_exit()
+	{
+		producer_running = false;
+		please_exit = false;
+	}
+
+	//
+
 	esp_err_t cleanup()
 	{
 		return ESP_OK;

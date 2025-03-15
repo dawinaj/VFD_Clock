@@ -44,6 +44,7 @@ namespace Backend
 
 		// SOFTWARE SETUP
 		TaskHandle_t ctrlloop_task = nullptr;
+		bool exit_flag = true;
 
 		gptimer_handle_t sync_timer = nullptr;
 
@@ -175,7 +176,7 @@ namespace Backend
 
 		filament_state(true);
 
-		while (1)
+		while (!Communicator::should_exit())
 		{
 			cycles = ulTaskNotifyTake(pdTRUE, 0);
 			while (ulTaskNotifyTake(pdTRUE, portMAX_DELAY) == 0)
@@ -194,10 +195,13 @@ namespace Backend
 
 	label_fail:
 
+		filament_state(false);
+
 		gptimer_stop(sync_timer);
 
 		ESP_LOGI(TAG, "Exiting...");
-		// Communicator::confirm_exit();
+
+		Communicator::confirm_exit();
 
 		ctrlloop_task = nullptr;
 		vTaskDelete(ctrlloop_task);
@@ -328,8 +332,10 @@ namespace Backend
 	}
 	static esp_err_t deinit_task()
 	{
-		vTaskDelete(ctrlloop_task); // void
-		ctrlloop_task = nullptr;
+		Communicator::request_exit();
+
+		while (ctrlloop_task)
+			vTaskDelay(10); // 10 RTOS ticks
 
 		return ESP_OK;
 	}
@@ -384,7 +390,7 @@ namespace Backend
 
 	esp_err_t init() // TODO add error checking
 	{
-		ESP_LOGI(TAG, "Initing Board...");
+		ESP_LOGI(TAG, "Initing Backend...");
 
 		init_gpio();
 
@@ -392,33 +398,32 @@ namespace Backend
 
 		init_expanders();
 
-		// SPAWN GPTIMER
-		// init_gptimer();
-
-		vTaskDelay(pdMS_TO_TICKS(500));
-
-		// SPAWN EXE TASK
-		init_task();
-
 		ESP_LOGI(TAG, "Done!");
 		return ESP_OK;
 	}
 
 	esp_err_t deinit()
 	{
-		ESP_LOGI(TAG, "Deiniting Board...");
+		ESP_LOGI(TAG, "Deiniting Backend...");
 
 		// KILL EXE TASK
 		deinit_task();
-
-		// KILL GPTIMER
-		// deinit_gptimer();
 
 		deinit_expanders();
 
 		deinit_i2c();
 
 		deinit_gpio();
+
+		ESP_LOGI(TAG, "Done!");
+		return ESP_OK;
+	}
+
+	esp_err_t run()
+	{
+		ESP_LOGI(TAG, "Running Backend...");
+
+		init_task();
 
 		ESP_LOGI(TAG, "Done!");
 		return ESP_OK;
