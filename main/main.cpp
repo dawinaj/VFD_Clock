@@ -18,9 +18,9 @@
 #include <esp_sntp.h>
 #include <esp_netif_sntp.h>
 
-#include <cstdlib>
-#include <cstring>
-#include <ctime>
+// #include <cstdlib>
+// #include <cstring>
+// #include <ctime>
 
 static const char *TAG = "[" __TIME__ "]VFD_Clock";
 
@@ -113,7 +113,7 @@ extern "C" void app_main(void)
 	}
 	//*/
 
-	/*/
+	//*/
 	{
 		Settings::wait_has_ip();
 
@@ -131,19 +131,6 @@ extern "C" void app_main(void)
 
 	setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
 	tzset();
-
-	// Print the local time
-	time_t now;
-	struct tm timeinfo;
-	while (1)
-	{
-		time(&now);
-		localtime_r(&now, &timeinfo);
-		char buffer[64];
-		strftime(buffer, sizeof(buffer), "%c", &timeinfo); // Format the time string
-		ESP_LOGI(TAG, "Local date and time: %s", buffer);
-		vTaskDelay(pdMS_TO_TICKS(10000)); // Wait 10 second
-	}
 
 	// what the heck you stupid formatter stop stealing my newline faggot
 }
