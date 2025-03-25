@@ -16,6 +16,7 @@
 
 #include "BME280.h"
 #include "SmartTouch.h"
+#include "SignalProcessing.h"
 
 #include "Settings.h"
 #include "Communicator.h"
@@ -30,6 +31,10 @@ namespace Frontend
 		constexpr spi_host_device_t spi_host = SPI3_HOST;
 
 		BME280_SPI bme280(spi_host, GPIO_NUM_2);
+
+		SmartTouch st({TOUCH_PAD_NUM8});
+		Hysteresis hys(0.4, 0.6);
+		BoolLowpass bllp(5);
 
 		// DATA STORES
 		std::array<char, 6> buf_temperature;
