@@ -60,4 +60,31 @@ public:
 	}
 };
 
+class PosEdge
+{
+private:
+	size_t req_cont;
+
+	mutable size_t curr_cont = 0;
+	mutable bool state;
+
+public:
+	BoolLowpass(size_t rs = 1, bool s = false) : req_cont(rs), state(s)
+	{
+	}
+	~BoolLowpass()
+	{
+	}
+
+	bool evaluate(bool value) const
+	{
+		if (value == state)
+			curr_cont = 0;
+		else if (++curr_cont >= req_cont)
+			state = value;
+
+		return state;
+	}
+};
+
 #endif
