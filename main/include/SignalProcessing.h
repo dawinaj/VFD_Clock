@@ -63,27 +63,44 @@ public:
 class PosEdge
 {
 private:
-	size_t req_cont;
-
-	mutable size_t curr_cont = 0;
-	mutable bool state;
+	mutable bool prev;
 
 public:
-	BoolLowpass(size_t rs = 1, bool s = false) : req_cont(rs), state(s)
+	PosEdge(bool p = false) : prev(p)
 	{
 	}
-	~BoolLowpass()
+	~PosEdge()
 	{
 	}
 
 	bool evaluate(bool value) const
 	{
-		if (value == state)
-			curr_cont = 0;
-		else if (++curr_cont >= req_cont)
-			state = value;
+		bool ret = !prev && value;
+		prev = value;
 
-		return state;
+		return ret;
+	}
+};
+
+class NegEdge
+{
+private:
+	mutable bool prev;
+
+public:
+	NegEdge(bool p = false) : prev(p)
+	{
+	}
+	~NegEdge()
+	{
+	}
+
+	bool evaluate(bool value) const
+	{
+		bool ret = prev && !value;
+		prev = value;
+
+		return ret;
 	}
 };
 
